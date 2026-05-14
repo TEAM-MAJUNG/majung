@@ -508,26 +508,44 @@ function parseTmapPts(data) {
 ══════════════════════════════════════ */
 function loadBusInfo(stop) {
   document.getElementById('bl').innerHTML = '<div class="loadmsg">🔄 실시간 버스 정보 불러오는 중...</div>';
-
   if(!stop.nodeId) { renderManualUI(); return; }
 
-  fetch('https://apis.data.go.kr/1613000/ArvlInfoInqireForCity/getSttnAcctoArvlPrearngeInfoList'
-    + '?serviceKey=' + encodeURIComponent(BUS_KEY)
-    + '&cityCode=' + (stop.cityCode || '36')
-    + '&nodeId='   + encodeURIComponent(stop.nodeId)
-    + '&numOfRows=10&pageNo=1&_type=json')
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    console.log('[마중] 버스 도착:', data);
+  /* JSONP 방식 — CORS 우회 시도 */
+  var cbName = '_busCb' + Date.now();
+  var timer = setTimeout(function(){
+    cleanup();
+    renderManualUI();
+  }, 8000);
+
+  function cleanup() {
+    delete window[cbName];
+    var s = document.getElementById(cbName);
+    if(s) s.parentNode.removeChild(s);
+    clearTimeout(timer);
+  }
+
+  window[cbName] = function(data) {
+    cleanup();
+    console.log('[마중] 버스 도착 JSONP:', data);
     var items = null;
     try {
       items = data.response.body.items.item;
       if(items && !Array.isArray(items)) items = [items];
-    } catch(e){ items=null; }
-    if(!items || items.length===0) { renderManualUI(); return; }
+    } catch(e){ items = null; }
+    if(!items || items.length === 0) { renderManualUI(); return; }
     renderBusList(items);
-  })
-  .catch(function(){ renderManualUI(); });
+  };
+
+  var script = document.createElement('script');
+  script.id = cbName;
+  script.src = 'https://apis.data.go.kr/1613000/ArvlInfoInqireForCity/getSttnAcctoArvlPrearngeInfoList'
+    + '?serviceKey=' + encodeURIComponent(BUS_KEY)
+    + '&cityCode='   + (stop.cityCode || '36')
+    + '&nodeId='     + encodeURIComponent(stop.nodeId)
+    + '&numOfRows=10&pageNo=1'
+    + '&callback='   + cbName;
+  script.onerror = function(){ cleanup(); renderManualUI(); };
+  document.head.appendChild(script);
 }
 
 function renderBusList(items) {
