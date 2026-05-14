@@ -306,12 +306,9 @@ function searchStopsGyeonggi(lat, lng) {
     console.log('[마중] 경기도 정류소:', data);
     var raw = null;
     try {
-      var body = data.response.body;
-      var total = parseInt(body.totalCount) || 0;
-      if(total > 0) {
-        raw = body.items.item;
-        if(raw && !Array.isArray(raw)) raw = [raw];
-      }
+      /* 경기도 API 응답 구조: msgBody.busStationAroundList */
+      raw = data.msgBody.busStationAroundList;
+      if(raw && !Array.isArray(raw)) raw = [raw];
     } catch(e){ raw=null; }
 
     if(!raw || raw.length === 0) {
@@ -322,16 +319,16 @@ function searchStopsGyeonggi(lat, lng) {
 
     console.log('[마중] 경기도 정류소 성공:', raw.length, '개');
     var stops = raw.map(function(item){
-      var sLat = parseFloat(item.y || item.latitude  || 0);
-      var sLng = parseFloat(item.x || item.longitude || 0);
+      var sLat = parseFloat(item.y || item.latitude  || item.centerY || 0);
+      var sLng = parseFloat(item.x || item.longitude || item.centerX || 0);
       return {
-        name:     item.stationName || item.bstopNm || '정류장',
-        nodeId:   item.stationId   || item.bstopId || '',
+        name:     item.stationName || item.bstopNm  || '정류장',
+        nodeId:   item.stationId   || item.stationId || '',
         cityCode: 'GG',
         type:     'GG',
         lat: sLat, lng: sLng,
         dist: Math.round(calcDist(lat, lng, sLat, sLng)),
-        addr: item.mobileNo || '', etaSec: null
+        addr: item.mobileNo || item.regionName || '', etaSec: null
       };
     }).filter(function(s){ return s.lat && s.lng; })
       .sort(function(a,b){ return a.dist-b.dist; })
@@ -578,12 +575,9 @@ function loadBusInfoGG(stop) {
     console.log('[마중] 경기도 버스 도착:', data);
     var items = null;
     try {
-      var body = data.response.body;
-      var total = parseInt(body.totalCount) || 0;
-      if(total > 0) {
-        items = body.items.item;
-        if(items && !Array.isArray(items)) items = [items];
-      }
+      /* 경기도 버스 도착 응답: msgBody.busArrivalList */
+      items = data.msgBody.busArrivalList;
+      if(items && !Array.isArray(items)) items = [items];
     } catch(e){ items=null; }
     if(!items || items.length === 0) { renderManualUI(); return; }
     renderBusList(items, 'GG');
