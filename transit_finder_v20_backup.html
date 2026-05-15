@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>대중교통 길찾기</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --blue: #1A73E8; --blue-light: #E8F0FE;
+  --green: #0F9D58; --red: #EA4335; --orange: #F9A825;
+  --gray-50: #F8F9FA; --gray-100: #F1F3F4; --gray-200: #E8EAED;
+  --gray-400: #BDC1C6; --gray-600: #80868B; --gray-800: #3C4043;
+}
+body { font-family: 'Noto Sans KR', sans-serif; height: 100vh; overflow: hidden; }
+.app { display: flex; height: 100vh; }
+
+/* ── 사이드바 ── */
+.sidebar {
+  width: 390px; min-width: 390px; background: white;
+  display: flex; flex-direction: column;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.12); z-index: 10; overflow: hidden;
+}
+.header { background: var(--blue); padding: 14px 14px 12px; flex-shrink: 0; }
+.logo {
+  display: flex; align-items: center; gap: 8px;
+  color: white; font-size: 15px; font-weight: 700; margin-bottom: 12px;
+}
+.logo-icon {
+  width: 28px; height: 28px; background: white; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.search-wrap { background: white; border-radius: 10px; overflow: hidden; }
+.search-row {
+  display: flex; align-items: center; padding: 0 10px;
+  border-bottom: 1px solid var(--gray-200); position: relative;
+}
+.search-row:last-child { border-bottom: none; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-right: 9px; }
+.dot-s { background: var(--green); }
+.dot-e { background: var(--red); }
+.search-input {
+  flex: 1; border: none; outline: none; font-size: 13px;
+  font-family: 'Noto Sans KR', sans-serif;
+  padding: 11px 70px 11px 0; color: var(--gray-800); background: transparent;
+}
+.search-input::placeholder { color: var(--gray-400); }
+.row-btns { position: absolute; right: 8px; display: flex; gap: 4px; align-items: center; }
+.gps-btn {
+  background: var(--blue-light); border: none; border-radius: 6px;
+  width: 24px; height: 24px; cursor: pointer; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.swap-btn {
+  background: var(--gray-100); border: none; border-radius: 50%;
+  width: 26px; height: 26px; cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; justify-content: center; color: var(--gray-600);
+}
+.search-btn {
+  width: 100%; margin-top: 9px; background: white; color: var(--blue);
+  border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 700;
+  font-family: 'Noto Sans KR', sans-serif; cursor: pointer;
+}
+.search-btn:hover { background: var(--blue-light); }
+
+/* ── 결과 패널 ── */
+.result-panel { flex: 1; overflow-y: auto; }
+.result-panel::-webkit-scrollbar { width: 4px; }
+.result-panel::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 2px; }
+
+.empty-state { padding: 40px 20px; text-align: center; }
+.empty-icon { font-size: 44px; margin-bottom: 14px; }
+.empty-title { font-size: 15px; font-weight: 700; color: var(--gray-800); margin-bottom: 6px; }
+.empty-desc { font-size: 13px; line-height: 1.8; color: var(--gray-600); }
+
+.loading { padding: 40px 20px; text-align: center; color: var(--gray-600); font-size: 13px; }
+.spinner {
+  width: 30px; height: 30px; border: 3px solid var(--gray-200);
+  border-top-color: var(--blue); border-radius: 50%;
+  animation: spin 0.8s linear infinite; margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.result-header {
+  padding: 12px 14px 8px; font-size: 12px; color: var(--gray-600);
+  border-bottom: 1px solid var(--gray-200); background: var(--gray-50);
+}
+.result-header strong { color: var(--blue); font-weight: 700; }
+
+/* ── 경로 카드 ── */
+.route-card {
+  border-bottom: 1px solid var(--gray-200); cursor: pointer; transition: background 0.15s;
+}
+.route-card:hover { background: var(--gray-50); }
+.route-card.active { background: var(--blue-light); border-left: 3px solid var(--blue); }
+.route-card-top { padding: 12px 14px 10px; }
+.route-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+.route-time-big { font-size: 22px; font-weight: 900; color: var(--gray-800); }
+.route-time-unit { font-size: 12px; color: var(--gray-600); margin-left: 2px; }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.chip { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+.chip-t { background: var(--gray-100); color: var(--gray-600); }
+.chip-w { background: #FFF3E0; color: #E65100; }
+.chip-f { background: #E8F5E9; color: #1B5E20; }
+
+/* 노선 바 */
+.route-bar { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.seg { display: flex; align-items: center; gap: 2px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.seg-sub { background: var(--blue-light); color: var(--blue); }
+.seg-bus { background: #E8F5E9; color: #2E7D32; }
+.seg-walk { background: var(--gray-100); color: var(--gray-600); }
+.seg-arr { color: var(--gray-400); font-size: 10px; }
+
+/* 상세 */
+.route-detail { display: none; padding: 10px 14px 14px; border-top: 1px solid var(--gray-200); background: white; }
+.route-card.active .route-detail { display: block; }
+
+.step { display: flex; gap: 10px; position: relative; }
+.step:not(:last-child)::after {
+  content: ''; position: absolute; left: 14px; top: 32px; bottom: -4px;
+  width: 2px; background: var(--gray-200); border-radius: 1px;
+}
+.step-icon {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0; position: relative; z-index: 1;
+}
+.step-body { flex: 1; padding-bottom: 16px; }
+.step-name { font-size: 13px; font-weight: 700; color: var(--gray-800); margin-bottom: 2px; }
+.step-info { font-size: 11px; color: var(--gray-600); line-height: 1.6; }
+
+/* 버스 도착 박스 */
+.arrival-box { margin-top: 10px; padding: 10px; background: var(--blue-light); border-radius: 8px; }
+.arrival-title { font-size: 11px; font-weight: 700; color: var(--blue); margin-bottom: 6px; }
+.arrival-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(26,115,232,0.15); font-size: 11px; }
+.arrival-item:last-child { border-bottom: none; }
+.bus-no { font-weight: 700; color: var(--gray-800); }
+.bus-eta { font-weight: 700; color: var(--blue); }
+.bus-eta.soon { color: var(--red); }
+
+.error-box {
+  margin: 14px; padding: 12px; background: #FFF3F3;
+  border: 1px solid #FFCCCC; border-radius: 8px;
+  font-size: 12px; color: var(--red); text-align: center; line-height: 1.6;
+}
+
+/* ── 지도 ── */
+.map-wrap { flex: 1; position: relative; }
+#map { width: 100%; height: 100%; }
+.locate-map-btn {
+  position: absolute; bottom: 20px; right: 20px; z-index: 999;
+  width: 40px; height: 40px; background: white; border: none; border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2); cursor: pointer; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .app { flex-direction: column; }
+  .sidebar { width: 100%; min-width: 100%; height: 58vh; }
+  .map-wrap { height: 42vh; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">🚌</div>
+        대중교통 길찾기
+      </div>
+      <div class="search-wrap">
+        <div class="search-row">
+          <div class="dot dot-s"></div>
+          <input class="search-input" id="startInput" type="text" placeholder="출발지 입력"/>
+          <div class="row-btns">
+            <button class="gps-btn" id="gpsBtn" onclick="useCurrentLocation()" title="현위치 사용">📍</button>
+          </div>
+        </div>
+        <div class="search-row">
+          <div class="dot dot-e"></div>
+          <input class="search-input" id="endInput" type="text" placeholder="도착지 입력"/>
+          <div class="row-btns">
+            <button class="swap-btn" onclick="swapLocations()">⇅</button>
+          </div>
+        </div>
+      </div>
+      <button class="search-btn" onclick="searchRoute()">🔍 경로 검색</button>
+    </div>
+    <div class="result-panel" id="resultPanel">
+      <div class="empty-state">
+        <div class="empty-icon">🗺️</div>
+        <div class="empty-title">어디로 가시나요?</div>
+        <div class="empty-desc">📍 버튼으로 현위치를 출발지로 설정하거나<br>직접 입력 후 경로 검색을 눌러주세요</div>
+      </div>
+    </div>
+  </div>
+  <div class="map-wrap">
+    <div id="map"></div>
+    <button class="locate-map-btn" onclick="moveToCurrentLocation()" title="현재 위치로">📍</button>
+  </div>
+</div>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  🔑 API 키 설정 (여기만 바꾸면 됩니다)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const ODSAY_KEY = 'Yb8s5CtXw3k446WLBr4RqcL9k1LDfuyr9YrEb719ZYQ'; 
+const BUS_KEY = '3074bbf236991f2bca83cb5332a45fe382e8b559ec15ad2b7120734136538fb4';
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  지도 초기화
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const map = L.map('map').setView([37.5665, 126.9780], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+let mapMarkers = [], mapPolylines = [];
+let currentCoords = null, currentMarker = null;
+let savedPaths = [];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  현위치
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function useCurrentLocation() {
+  const btn = document.getElementById('gpsBtn');
+  btn.textContent = '⏳';
+  navigator.geolocation?.getCurrentPosition(async pos => {
+    const { latitude: lat, longitude: lng } = pos.coords;
+    currentCoords = { lat, lng };
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ko`);
+      const d = await res.json();
+      const a = d.address;
+      document.getElementById('startInput').value = `현재 위치 (${a.road || a.suburb || a.neighbourhood || '현재 위치'})`;
+    } catch { document.getElementById('startInput').value = '현재 위치'; }
+    if (currentMarker) map.removeLayer(currentMarker);
+    currentMarker = L.circleMarker([lat, lng], { radius: 10, fillColor: '#1A73E8', color: 'white', weight: 3, fillOpacity: 1 }).addTo(map);
+    map.setView([lat, lng], 15);
+    btn.textContent = '✅';
+  }, () => { btn.textContent = '📍'; alert('위치 권한을 허용해주세요'); }, { enableHighAccuracy: true });
+}
+
+function moveToCurrentLocation() {
+  if (currentCoords) map.setView([currentCoords.lat, currentCoords.lng], 15);
+  else navigator.geolocation?.getCurrentPosition(p => map.setView([p.coords.latitude, p.coords.longitude], 15));
+}
+
+function swapLocations() {
+  const s = document.getElementById('startInput'), e = document.getElementById('endInput');
+  [s.value, e.value] = [e.value, s.value];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  주소 → 좌표 (Nominatim)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function getCoords(address) {
+  if (address.startsWith('현재 위치') && currentCoords) return { ...currentCoords, name: '현재 위치' };
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address + ' 대한민국')}&format=json&limit=1&accept-language=ko`);
+  const data = await res.json();
+  if (!data?.length) throw new Error(`"${address}" 위치를 찾을 수 없어요`);
+  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  지도 유틸
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function clearMap() {
+  mapMarkers.forEach(m => map.removeLayer(m));
+  mapPolylines.forEach(p => map.removeLayer(p));
+  mapMarkers = []; mapPolylines = [];
+}
+
+function makeIcon(color, label) {
+  return L.divIcon({
+    html: `<div style="background:${color};color:white;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;font-family:'Noto Sans KR',sans-serif;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap">${label}</div>`,
+    className: '', iconAnchor: [20, 35]
+  });
+}
+
+// 지하철 노선 색상
+function subwayColor(code) {
+  const colors = { 1:'#263C96',2:'#33A23D',3:'#FF6C00',4:'#00A5DE',5:'#8B50A4',6:'#CD7C2F',7:'#747F00',8:'#E6186C',9:'#BDB092' };
+  return colors[code] || '#1A73E8';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  경로 검색 메인
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function searchRoute() {
+  const sName = document.getElementById('startInput').value.trim();
+  const eName = document.getElementById('endInput').value.trim();
+  const panel = document.getElementById('resultPanel');
+
+  if (!sName || !eName) {
+    panel.innerHTML = `<div class="error-box">⚠️ 출발지와 도착지를 모두 입력해주세요</div>`;
+    return;
+  }
+
+  panel.innerHTML = `<div class="loading"><div class="spinner"></div>경로를 검색하고 있어요...</div>`;
+  clearMap();
+
+  try {
+    const [start, end] = await Promise.all([getCoords(sName), getCoords(eName)]);
+
+    // 마커 표시
+    mapMarkers.push(
+      L.marker([start.lat, start.lng], { icon: makeIcon('#0F9D58', '출발') }).addTo(map),
+      L.marker([end.lat, end.lng], { icon: makeIcon('#EA4335', '도착') }).addTo(map)
+    );
+    map.fitBounds([[start.lat, start.lng],[end.lat, end.lng]], { padding: [40,40] });
+
+    // ODsay 경로 탐색
+    callODsay(start, end, sName, eName, panel);
+
+  } catch(e) {
+    panel.innerHTML = `<div class="error-box">❌ ${e.message}</div>`;
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ODsay JSONP 호출
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function callODsay(start, end, sName, eName, panel) {
+  try {
+    const url = `https://api.odsay.com/v1/api/searchPubTransPathT?SX=${start.lng}&SY=${start.lat}&EX=${end.lng}&EY=${end.lat}&apiKey=${ODSAY_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error || !data.result?.path?.length) {
+      panel.innerHTML = `<div class="empty-state"><div class="empty-icon">😅</div><div class="empty-title">경로를 찾을 수 없어요</div><div class="empty-desc">대중교통 경로가 없거나 너무 먼 거리예요</div></div>`;
+      return;
+    }
+    savedPaths = data.result.path;
+    renderRoutes(data.result.path, sName, eName, start);
+  } catch(e) {
+    panel.innerHTML = `<div class="error-box">❌ 경로 검색 실패<br><small>${e.message}</small></div>`;
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  경로 렌더링
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderRoutes(paths, sName, eName, startCoord) {
+  const panel = document.getElementById('resultPanel');
+  let html = `<div class="result-header"><strong>${sName}</strong> → <strong>${eName}</strong> · 경로 ${paths.length}개</div>`;
+
+  paths.forEach((path, idx) => {
+    const info = path.info;
+    const nonWalk = path.subPath.filter(sp => sp.trafficType !== 3);
+
+    // 노선 바
+    let segHtml = '';
+    nonWalk.forEach((sp, i) => {
+      if (i > 0) segHtml += `<span class="seg-arr">›</span>`;
+      const isSub = sp.trafficType === 1;
+      const name = sp.lane?.[0]?.name || sp.lane?.[0]?.busNo || '';
+      segHtml += `<span class="seg ${isSub ? 'seg-sub' : 'seg-bus'}">${isSub ? '🚇' : '🚌'} ${name}</span>`;
+    });
+    if (!segHtml) segHtml = `<span class="seg seg-walk">🚶 도보</span>`;
+
+    // 상세 스텝
+    let stepsHtml = '';
+    path.subPath.forEach(sp => {
+      const isSub = sp.trafficType === 1, isBus = sp.trafficType === 2, isWalk = sp.trafficType === 3;
+      let icon, bg, name, info2, arrHtml = '';
+
+      if (isWalk) {
+        icon = '🚶'; bg = '#F1F3F4';
+        name = '도보 이동';
+        info2 = `${sp.sectionTime}분 · 약 ${sp.distance}m`;
+      } else if (isSub) {
+        const lineCode = sp.lane?.[0]?.subwayCode;
+        const lineColor = subwayColor(lineCode);
+        icon = '🚇'; bg = '#E8F0FE';
+        name = sp.lane?.[0]?.name || '지하철';
+        const stops = sp.passStopList?.stations?.length || 0;
+        info2 = `<span style="color:${lineColor};font-weight:700">${name}</span> · ${sp.startName || ''} 승차 → ${sp.endName || ''} 하차<br>${sp.sectionTime}분 소요 · ${stops}개역 이동`;
+      } else {
+        icon = '🚌'; bg = '#E8F5E9';
+        const busNo = sp.lane?.[0]?.busNo || sp.lane?.[0]?.name || '';
+        name = `${busNo}번 버스`;
+        const stops = sp.passStopList?.stations?.length || 0;
+        info2 = `<span style="color:#2E7D32;font-weight:700">${busNo}번</span> · ${sp.startName || ''} 승차 → ${sp.endName || ''} 하차<br>${sp.sectionTime}분 소요 · ${stops}개 정류장 이동`;
+
+        // 버스 도착 정보 영역
+        if (sp.startStationID) {
+          arrHtml = `<div id="arr_${idx}_${sp.startStationID}" style="margin-top:6px;font-size:11px;color:#80868B">🔄 도착 정보 조회 중...</div>`;
+        }
+      }
+
+      stepsHtml += `
+        <div class="step">
+          <div class="step-icon" style="background:${bg}">${icon}</div>
+          <div class="step-body">
+            <div class="step-name">${name}</div>
+            <div class="step-info">${info2}${arrHtml}</div>
+          </div>
+        </div>`;
+    });
+
+    html += `
+      <div class="route-card ${idx===0?'active':''}" onclick="selectRoute(this,${idx})">
+        <div class="route-card-top">
+          <div class="route-meta">
+            <div><span class="route-time-big">${info.totalTime}</span><span class="route-time-unit">분</span></div>
+            <div class="chips">
+              <span class="chip chip-t">환승 ${info.transferCount ?? 0}회</span>
+              <span class="chip chip-w">도보 ${info.totalWalk}m</span>
+              ${info.payment>0?`<span class="chip chip-f">${info.payment.toLocaleString()}원</span>`:''}
+            </div>
+          </div>
+          <div class="route-bar">${segHtml}</div>
+        </div>
+        <div class="route-detail">${stepsHtml}</div>
+      </div>`;
+  });
+
+  panel.innerHTML = html;
+
+  // 첫 번째 경로 지도에 표시 + 버스 도착 조회
+  drawRouteOnMap(paths[0]);
+  fetchBusArrivalsForPath(paths[0], 0);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  지도에 경로 그리기
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function drawRouteOnMap(path) {
+  mapPolylines.forEach(p => map.removeLayer(p));
+  mapPolylines = [];
+
+  const bounds = [];
+
+  path.subPath.forEach(sp => {
+    const isSub = sp.trafficType === 1, isBus = sp.trafficType === 2, isWalk = sp.trafficType === 3;
+    const stations = sp.passStopList?.stations || [];
+    const pts = stations.filter(s => s.x && s.y).map(s => {
+      const p = [parseFloat(s.y), parseFloat(s.x)];
+      bounds.push(p);
+      return p;
+    });
+
+    if (pts.length > 1) {
+      let color = '#AAAAAA', weight = 3, dash = '6,6';
+      if (isSub) { color = subwayColor(sp.lane?.[0]?.subwayCode); weight = 5; dash = null; }
+      else if (isBus) { color = '#0F9D58'; weight = 5; dash = null; }
+
+      const line = L.polyline(pts, { color, weight, opacity: 0.85, dashArray: dash });
+      line.addTo(map);
+      mapPolylines.push(line);
+    }
+  });
+
+  if (bounds.length > 0) map.fitBounds(bounds, { padding: [40, 40] });
+}
+
+function selectRoute(card, idx) {
+  document.querySelectorAll('.route-card').forEach(c => c.classList.remove('active'));
+  card.classList.add('active');
+  drawRouteOnMap(savedPaths[idx]);
+  fetchBusArrivalsForPath(savedPaths[idx], idx);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  버스 도착 정보 (경로 내 모든 버스)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function fetchBusArrivalsForPath(path, pathIdx) {
+  path.subPath.forEach(sp => {
+    if (sp.trafficType === 2 && sp.startStationID) {
+      const cityCode = sp.startStationCityCode || sp.lane?.[0]?.busLocalBlID?.toString().substring(0,2) || 11;
+      fetchArrival(sp.startStationID, sp.startName, `arr_${pathIdx}_${sp.startStationID}`, cityCode);
+    }
+  });
+}
+
+async function fetchArrival(stationId, stationName, elId, cityCode) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:11px;color:#80868B;padding:4px 0">🔄 도착 정보 조회 중...</div>';
+  try {
+    // 서울특별시 버스도착정보조회 서비스 (올바른 엔드포인트)
+    const url = `http://ws.bus.go.kr/api/rest/arrive/getArrInfoByRouteAll?serviceKey=${BUS_KEY}&stId=${stationId}&numOfRows=3&resultType=json`;
+    const res = await fetch(url);
+    const text = await res.text();
+    // XML 응답 파싱
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, 'text/xml');
+    const items = xml.querySelectorAll('itemList');
+    if (!items.length) { el.innerHTML = ''; return; }
+    let html = `<div class="arrival-box"><div class="arrival-title">🚌 ${stationName || '정류장'} 실시간 도착</div>`;
+    Array.from(items).slice(0,3).forEach(item => {
+      const rtNm = item.querySelector('rtNm')?.textContent || '';
+      const arrmsg1 = item.querySelector('arrmsg1')?.textContent || '';
+      const soon = arrmsg1.includes('곧') || arrmsg1.includes('0분');
+      html += `<div class="arrival-item">
+        <span class="bus-no">${rtNm}번</span>
+        <span class="bus-eta ${soon?'soon':''}">${arrmsg1}</span>
+      </div>`;
+    });
+    el.outerHTML = html + '</div>';
+  } catch(e) { el.innerHTML = ''; }
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') searchRoute(); });
+</script>
+</body>
+</html>
