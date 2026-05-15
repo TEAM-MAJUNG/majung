@@ -287,10 +287,10 @@ function searchStopsFallback(lat, lng) {
 }
 
 /* 서울 열린데이터광장 — 좌표기반 근접정류소 목록조회
-   GET https://api.openapi.seoul.go.kr:8088/{key}/json/getNearStationList/1/10/{x}/{y} */
+   GET https://openAPI.seoul.go.kr:8088/{key}/json/getNearStationList/1/10/{x}/{y} */
 function searchStopsSeoul(lat, lng) {
   console.log('[마중] 서울 열린데이터광장 API 시도');
-  var url = 'https://api.openapi.seoul.go.kr:8088/'
+  var url = 'https://openAPI.seoul.go.kr:8088/'
     + SEOUL_KEY + '/json/getNearStationList/1/10/'
     + lng + '/' + lat;
 
@@ -337,6 +337,47 @@ function searchStopsSeoul(lat, lng) {
   });
 }
 
+
+
+/* 경기도_정류소 조회 API
+   Base URL: apis.data.go.kr/6410000/busstationservice/v2 */
+function searchStopsGyeonggi(lat, lng) {
+  console.log('[마중] 경기도 정류소 API 시도');
+  fetch('https://apis.data.go.kr/6410000/busstationservice/v2/getBusStationAroundListv2'
+    + '?serviceKey=' + encodeURIComponent(BUS_KEY)
+    + '&x=' + lng + '&y=' + lat
+    + '&radius=500&numOfRows=10&pageNo=1&_type=json')
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    console.log('[마중] 경기도 정류소:', data);
+    var raw = null;
+    try {
+      raw = data.msgBody.busStationAroundList;
+      if(raw && !Array.isArray(raw)) raw = [raw];
+    } catch(e){ raw=null; }
+    if(!raw || raw.length === 0) {
+      console.log('[마중] 경기도 결과 없음 → 카카오 fallback');
+      searchStopsKakao(lat, lng); return;
+    }
+    console.log('[마중] 경기도 성공:', raw.length, '개');
+    var stops = raw.map(function(item){
+      var sLat = parseFloat(item.y || item.latitude  || item.centerY || 0);
+      var sLng = parseFloat(item.x || item.longitude || item.centerX || 0);
+      return {
+        name:     item.stationName || '정류장',
+        nodeId:   item.stationId   || '',
+        cityCode: 'GG', type: 'GG',
+        lat: sLat, lng: sLng,
+        dist: Math.round(calcDist(lat, lng, sLat, sLng)),
+        addr: item.mobileNo || item.regionName || '', etaSec: null
+      };
+    }).filter(function(s){ return s.lat && s.lng; })
+      .sort(function(a,b){ return a.dist-b.dist; }).slice(0, 6);
+    if(stops.length === 0) { searchStopsKakao(lat, lng); return; }
+    renderStopsOnMap(stops, lat, lng);
+  })
+  .catch(function(e){ console.error('[마중] 경기도 오류:', e); searchStopsKakao(lat, lng); });
+}
 
 /* 카카오 로컬 REST API fallback */
 function searchStopsKakao(lat, lng) {
@@ -563,12 +604,12 @@ function loadBusInfoTAGO(stop) {
 }
 
 /* 서울 버스 도착 — 서울 열린데이터광장
-   GET https://api.openapi.seoul.go.kr:8088/{key}/json/getArrInfoByRouteAllList/1/30/{arsId} */
+   GET https://openAPI.seoul.go.kr:8088/{key}/json/getArrInfoByRouteAllList/1/30/{arsId} */
 function loadBusInfoSeoul(stop) {
   var arsId = stop.arsId || stop.nodeId;
   if(!arsId) { renderManualUI(); return; }
 
-  var url = 'https://api.openapi.seoul.go.kr:8088/'
+  var url = 'https://openAPI.seoul.go.kr:8088/'
     + SEOUL_KEY + '/json/getArrInfoByRouteAllList/1/30/' + arsId;
 
   fetch(url)
