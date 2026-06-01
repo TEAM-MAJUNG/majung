@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>일사량 API 테스트 — 마중</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#2563eb;--blue-d:#1d4ed8;--blue-l:#eff6ff;
+  --green:#16a34a;--orange:#ea580c;--red:#dc2626;
+  --text:#111827;--muted:#6b7280;--border:#e5e7eb;--bg:#f9fafb;
+}
+body{font-family:'Noto Sans KR',sans-serif;background:#f1f5f9;color:var(--text);min-height:100vh;padding:24px}
+.wrap{max-width:820px;margin:0 auto}
+h1{font-size:20px;font-weight:700;margin-bottom:4px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+.card{background:#fff;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.07)}
+.card-title{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:14px}
+.form-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:12px;color:var(--muted);font-weight:500}
+.form-group input,.form-group select{padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:'DM Mono',monospace;outline:none;transition:border-color .15s}
+.form-group input:focus,.form-group select:focus{border-color:var(--blue)}
+.btn{padding:10px 20px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s}
+.btn:hover{background:var(--blue-d)}
+.btn:disabled{background:#9ca3af;cursor:not-allowed}
+.btn.sm{padding:7px 14px;font-size:13px}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.badge.ok{background:rgba(22,163,74,.12);color:var(--green)}
+.badge.fail{background:rgba(220,38,38,.1);color:var(--red)}
+.badge.wait{background:rgba(100,116,139,.1);color:#64748b}
+.badge.running{background:rgba(37,99,235,.1);color:var(--blue)}
+.test-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--border)}
+.test-item:last-child{border-bottom:none}
+.test-nm{font-size:14px;font-weight:600}
+.test-url{font-size:11px;color:#94a3b8;font-family:'DM Mono',monospace;margin-top:3px;word-break:break-all}
+.test-desc{font-size:12px;color:var(--muted);margin-top:2px}
+.url-box{background:#1e293b;color:#7dd3fc;border-radius:10px;padding:12px 16px;font-family:'DM Mono',monospace;font-size:11px;line-height:1.7;word-break:break-all;margin-bottom:12px}
+.result-box{background:var(--bg);border-radius:10px;padding:16px;font-family:'DM Mono',monospace;font-size:12px;line-height:1.8;max-height:360px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+.result-box.empty{color:var(--muted);font-family:'Noto Sans KR',sans-serif;font-size:13px;text-align:center;padding:32px}
+.region-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-top:10px}
+.rbtn{padding:8px;border:1.5px solid var(--border);border-radius:10px;background:#fff;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;text-align:center;font-family:inherit}
+.rbtn:hover{border-color:var(--blue);background:var(--blue-l);color:var(--blue)}
+.rbtn.active{border-color:var(--blue);background:var(--blue);color:#fff}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(37,99,235,.3);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:5px}
+.verdict{padding:14px 16px;border-radius:12px;font-size:13px;line-height:1.8;margin-top:4px}
+.verdict.ok{background:#f0fdf4;border:1px solid #bbf7d0}
+.verdict.fail{background:#fef2f2;border:1px solid #fecaca}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>☀️ 실시간 일사량 API 테스트</h1>
+  <div class="sub">한국에너지기술연구원 · 엔드포인트: https://apis.data.go.kr/B551184/SrQtyService — 마중(MA-JUNG) 프로젝트</div>
+
+  <!-- API 키 -->
+  <div class="card">
+    <div class="card-title">API 키</div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>서비스 키 (공공데이터포털 인증키)</label>
+        <input type="text" id="apiKey" value="27cfeb909ef186e6d7fadfdccc6dac5c6d9ffa43133beea2fad0f26da89498fb" style="width:100%">
+      </div>
+    </div>
+  </div>
+
+  <!-- 오퍼레이션 테스트 -->
+  <div class="card">
+    <div class="card-title">오퍼레이션 테스트 — B551184/SrQtyService</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+      같은 엔드포인트에 오퍼레이션명 후보들을 붙여서 순서대로 테스트해요. 공공데이터포털 신청 페이지에서 오퍼레이션명을 확인했다면 아래 입력란에 직접 추가할 수 있어요.
+    </p>
+    <div id="testList"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
+      <button class="btn" id="runBtn" onclick="runAllTests()">전체 테스트 실행</button>
+      <div class="form-group" style="flex:1;min-width:200px">
+        <label>오퍼레이션명 직접 추가</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="customOp" placeholder="예: getRtrvSrQty" style="flex:1">
+          <button class="btn sm" onclick="addCustomOp()">추가</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 지역 + 파라미터 -->
+  <div class="card">
+    <div class="card-title">조회 파라미터</div>
+    <div class="region-grid">
+      <button class="rbtn active" onclick="setRegion(this,'37.5665','126.9780')">서울</button>
+      <button class="rbtn" onclick="setRegion(this,'35.1796','129.0756')">부산</button>
+      <button class="rbtn" onclick="setRegion(this,'35.8714','128.6014')">대구</button>
+      <button class="rbtn" onclick="setRegion(this,'35.1595','126.8526')">광주</button>
+      <button class="rbtn" onclick="setRegion(this,'36.3504','127.3845')">대전</button>
+      <button class="rbtn" onclick="setRegion(this,'33.4996','126.5312')">제주</button>
+      <button class="rbtn" onclick="setRegion(this,'37.2636','127.0286')">수원</button>
+      <button class="rbtn" onclick="setRegion(this,'37.4563','126.7052')">인천</button>
+    </div>
+    <div class="form-row" style="margin-top:14px">
+      <div class="form-group"><label>위도</label><input type="text" id="lat" value="37.5665" style="width:120px"></div>
+      <div class="form-group"><label>경도</label><input type="text" id="lng" value="126.9780" style="width:120px"></div>
+      <div class="form-group"><label>날짜 (YYYYMMDD)</label><input type="text" id="reqDate" style="width:120px"></div>
+      <div class="form-group"><label>시간 (HH, 선택)</label><input type="text" id="reqHour" placeholder="14" style="width:80px"></div>
+    </div>
+  </div>
+
+  <!-- 요청 URL & 응답 -->
+  <div class="card">
+    <div class="card-title">마지막 요청 URL</div>
+    <div class="url-box" id="urlBox">테스트를 실행하면 요청 URL이 표시됩니다.</div>
+    <div class="card-title">응답</div>
+    <div class="result-box empty" id="resultBox">결과가 여기 표시됩니다.</div>
+  </div>
+
+  <!-- 판정 -->
+  <div id="verdictWrap"></div>
+</div>
+
+<script>
+var BASE = 'https://apis.data.go.kr/B551184/SrQtyService';
+
+// 오퍼레이션 후보 목록
+var OPS = [
+  { name:'getRtrvSrQty',        desc:'실시간 일사량 조회 (추정 1)' },
+  { name:'getHrlySrQty',        desc:'시간별 일사량 조회 (추정 2)' },
+  { name:'getDlySrQty',         desc:'일별 일사량 조회 (추정 3)' },
+  { name:'getSrQtyInfo',        desc:'일사량 정보 조회 (추정 4)' },
+  { name:'getSolarRadiation',   desc:'Solar Radiation (추정 5)' },
+  { name:'getObsrSrQty',        desc:'관측 일사량 조회 (추정 6)' },
+];
+
+// 날짜 기본값
+(function(){
+  var d=new Date(), y=d.getFullYear(),
+      m=String(d.getMonth()+1).padStart(2,'0'),
+      day=String(d.getDate()).padStart(2,'0');
+  document.getElementById('reqDate').value = y+m+day;
+  document.getElementById('reqHour').value = String(d.getHours()).padStart(2,'0');
+})();
+
+function renderList(){
+  var html='';
+  OPS.forEach(function(op,i){
+    html+='<div class="test-item" id="ti_'+i+'">'
+      +'<div style="flex:1">'
+        +'<div class="test-nm">'+op.name+'</div>'
+        +'<div class="test-desc">'+op.desc+'</div>'
+        +'<div class="test-url">'+BASE+'/'+op.name+'</div>'
+      +'</div>'
+      +'<span class="badge wait" id="badge_'+i+'">대기</span>'
+    +'</div>';
+  });
+  document.getElementById('testList').innerHTML = html;
+}
+renderList();
+
+function setRegion(btn, lat, lng){
+  document.querySelectorAll('.rbtn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  document.getElementById('lat').value = lat;
+  document.getElementById('lng').value = lng;
+}
+
+function addCustomOp(){
+  var val = document.getElementById('customOp').value.trim();
+  if(!val) return;
+  OPS.push({name:val, desc:'직접 추가'});
+  document.getElementById('customOp').value='';
+  renderList();
+}
+
+function buildUrl(opName){
+  var key  = document.getElementById('apiKey').value.trim();
+  var lat  = document.getElementById('lat').value.trim();
+  var lng  = document.getElementById('lng').value.trim();
+  var date = document.getElementById('reqDate').value.trim();
+  var hour = document.getElementById('reqHour').value.trim();
+  var url  = BASE+'/'+opName
+    +'?serviceKey='+encodeURIComponent(key)
+    +'&lat='+lat+'&lon='+lng
+    +'&tm='+date
+    +(hour?'&tm2='+hour:'')
+    +'&numOfRows=24&pageNo=1&_type=json';
+  return url;
+}
+
+async function runAllTests(){
+  var btn = document.getElementById('runBtn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spin"></span>테스트 중...';
+  document.getElementById('verdictWrap').innerHTML='';
+
+  var successOp = null;
+
+  for(var i=0;i<OPS.length;i++){
+    var badge = document.getElementById('badge_'+i);
+    if(!badge) continue;
+    badge.className='badge running';
+    badge.textContent='요청 중...';
+
+    var url = buildUrl(OPS[i].name);
+    document.getElementById('urlBox').textContent = url;
+
+    try{
+      var res = await fetch(url);
+      var text = await res.text();
+
+      // 오류 키워드 체크
+      var isErr = text.includes('SERVICE_KEY_IS_NOT_REGISTERED')
+               || text.includes('NO_OPENAPI_SERVICE_ERROR')
+               || text.includes('LIMITED_NUMBER_OF_SERVICE')
+               || text.includes('INVALID_REQUEST_PARAMETER')
+               || (res.status >= 400 && !text.includes('"response"'));
+
+      if(!isErr && res.ok){
+        badge.className='badge ok'; badge.textContent='✓ 응답 있음';
+        successOp = OPS[i].name;
+        var parsed=null; try{parsed=JSON.parse(text);}catch(e){}
+        document.getElementById('resultBox').className='result-box';
+        document.getElementById('resultBox').textContent = parsed ? JSON.stringify(parsed,null,2) : text;
+        showVerdict(true, OPS[i].name);
+        break; // 성공하면 중단
+      } else {
+        badge.className='badge fail';
+        if(text.includes('SERVICE_KEY_IS_NOT_REGISTERED')) badge.textContent='✗ 키 미등록';
+        else if(text.includes('NO_OPENAPI_SERVICE_ERROR'))  badge.textContent='✗ 오퍼레이션 없음';
+        else if(text.includes('INVALID_REQUEST_PARAMETER')) badge.textContent='✗ 파라미터 오류';
+        else badge.textContent='✗ '+res.status;
+        document.getElementById('resultBox').className='result-box';
+        document.getElementById('resultBox').textContent = text.substring(0,1000);
+      }
+    } catch(e){
+      badge.className='badge fail';
+      var isCors = e.message&&(e.message.includes('Failed to fetch')||e.message.includes('CORS'));
+      badge.textContent = isCors ? '✗ CORS 차단' : '✗ 네트워크 오류';
+      document.getElementById('resultBox').className='result-box';
+      document.getElementById('resultBox').textContent = (isCors
+        ? '[CORS 차단]\nGitHub Pages(https://)에서 테스트하면 정확하게 확인할 수 있어요.\n\n'
+        : '') + '오류: '+e.message;
+      if(isCors){ showVerdict('cors', OPS[i].name); break; }
+    }
+
+    await new Promise(function(r){setTimeout(r,600);});
+  }
+
+  if(!successOp) showVerdict(false, null);
+  btn.disabled=false; btn.textContent='다시 테스트';
+}
+
+function showVerdict(status, opName){
+  var w = document.getElementById('verdictWrap');
+  if(status===true){
+    w.innerHTML='<div class="card"><div class="card-title">판정</div>'
+      +'<div class="verdict ok">'
+      +'<strong>✅ API 작동 확인 — 마중 앱 연동 가능</strong><br><br>'
+      +'오퍼레이션 <code>'+opName+'</code> 정상 응답.<br>'
+      +'CORS 허용 상태 → GitHub Pages에서 fetch로 직접 호출 가능해요.<br><br>'
+      +'<strong>마중 로직 연동 방법:</strong><br>'
+      +'일사량 ≥ 600 W/m² → λ = 0.10 (맑은 날, 에어컨 더 일찍 가동)<br>'
+      +'일사량 200~600   → λ = 0.20 (기본값)<br>'
+      +'일사량 &lt; 200  → λ = 0.35 (야간/실내, 늦게 가동해도 됨)'
+      +'</div></div>';
+  } else if(status==='cors'){
+    w.innerHTML='<div class="card"><div class="card-title">판정</div>'
+      +'<div class="verdict fail">'
+      +'<strong>⚠️ CORS 차단 — localhost에서는 막힘</strong><br><br>'
+      +'이 파일을 GitHub Pages에 올려서 테스트해야 정확해요.<br>'
+      +'GitHub Pages(https://)에서 열면 CORS가 허용되는 경우가 많아요.<br><br>'
+      +'<strong>대안 (API 연동 안 될 경우):</strong><br>'
+      +'new Date()로 현재 시간대 판단 → λ 자동 결정<br>'
+      +'오전 10시~오후 3시: λ=0.10 / 오전·오후: λ=0.20 / 야간: λ=0.35'
+      +'</div></div>';
+  } else {
+    w.innerHTML='<div class="card"><div class="card-title">판정</div>'
+      +'<div class="verdict fail">'
+      +'<strong>❌ 모든 오퍼레이션 실패</strong><br><br>'
+      +'가능한 원인:<br>'
+      +'1. 공공데이터포털에서 이 API 신청 승인이 아직 안 됐을 수 있어요<br>'
+      +'2. 오퍼레이션명이 다를 수 있어요 — 포털 상세 페이지에서 정확한 오퍼레이션명 확인 후 위 "직접 추가"란에 입력해보세요<br>'
+      +'3. GitHub Pages에서 테스트하면 결과가 달라질 수 있어요'
+      +'</div></div>';
+  }
+}
+</script>
+</body>
+</html>
