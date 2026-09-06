@@ -803,10 +803,20 @@ function initMaps() {
   map1 = new kakao.maps.Map(document.getElementById('km1'), {center:c, level:4});
   map2 = new kakao.maps.Map(document.getElementById('km2'), {center:c, level:4});
   map3 = new kakao.maps.Map(document.getElementById('km3'), {center:c, level:4});
+  setTimeout(function() {
+    map1.relayout(); map1.setCenter(c);
+    map2.relayout(); map2.setCenter(c);
+    map3.relayout(); map3.relayout(); map3.setCenter(c);
+  }, 300);
   kakao.maps.event.addListener(map1, 'click', function(e){
     setMyLoc(e.latLng.getLat(), e.latLng.getLng());
   });
 }
+window.addEventListener('resize', function() {
+  if(map1) { map1.relayout(); }
+  if(map2) { map2.relayout(); }
+  if(map3) { map3.relayout(); }
+});
 
 /* ══ 내 위치 ══════════════════════════════════════ */
 function setMyLoc(lat, lng) {
