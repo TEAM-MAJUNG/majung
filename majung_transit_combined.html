@@ -462,8 +462,15 @@ function switchTab(tab) {
     setTimeout(() => { if (typeof initMajung === 'function') initMajung(); }, 100);
   }
   // 길찾기 탭 전환 시 Leaflet 지도 크기 재조정
-  if (tab === 'transit' && window._leafletMap) {
+ if (tab === 'transit' && window._leafletMap) {
     setTimeout(() => { window._leafletMap.invalidateSize(); }, 100);
+  }
+  if (tab === 'majung') {
+    setTimeout(() => {
+      if(map1) { map1.relayout(); }
+      if(map2) { map2.relayout(); }
+      if(map3) { map3.relayout(); }
+    }, 150);
   }
 }
 
